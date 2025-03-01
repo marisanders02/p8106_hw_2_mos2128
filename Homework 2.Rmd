@@ -1,0 +1,86 @@
+---
+title: "Homework 2"
+author: "Mari Sanders"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(caret)
+library(glmnet)
+library(tidymodels)
+library(mlbench)
+library(pROC)
+library(pdp)
+library(vip)
+library(splines)
+library(mgcv)
+library(pdp)
+library(earth)
+```
+
+# Data Import + Splitting
+
+```{r}
+college <- read_csv("College.csv")
+data_split <- initial_split(college, prop = 0.80)
+
+training_data <- training(data_split)
+testing_data <- testing(data_split)
+
+```
+
+
+# Problem 1 
+
+```{r}
+test_mse <- numeric(length(dfs))
+grid <- seq(from = min(training_data$perc.alumni), 
+            to = max(training_data$perc.alumni), 
+            length.out = 100)
+colors <- rainbow(length(dfs))
+dfs <- c(2,3,4,5,6,7,8,9,10)
+plot(training_data$perc.alumni, training_data$Outstate, pch = 20, col = "grey",
+     xlab = "Percentage of Alumni Who Donate", ylab = "Out-of-State Tuition",
+     main = "Smoothing Splines with Different Degrees of Freedom")
+
+for (i in 1:length(dfs)) {
+  fit <- smooth.spline(training_data$perc.alumni, training_data$Outstate, df = dfs[i])
+  pred.ss <- predict(fit, x = grid)  
+  lines(pred.ss$x, pred.ss$y, col = colors[i], lwd = 2)  
+  pred_test <- predict(fit, x = testing_data$perc.alumni)
+  
+  # Compute test MSE
+  test_mse[i] <- sqrt(mean((testing_data$Outstate - pred_test$y)^2))
+
+}
+
+
+points(testing_data$perc.alumni, testing_data$Outstate, pch = 20, col = "blue")
+
+
+legend("topright", legend = paste("df =", dfs), col = colors, lwd = 2, cex = 0.8)
+
+best_df <- dfs[which.min(test_mse)]
+```
+
+By using root mean squared error, the best degrees of freedom for the smoothing splines is 2 
+
+```{r}
+optimal_fit <- smooth.spline(training_data$perc.alumni, training_data$Outstate, df = best_df)
+optimal_pred <- predict(optimal_fit, x = grid)
+
+plot(training_data$perc.alumni, training_data$Outstate, pch = 20, col = "grey",
+     xlab = "Percentage of Alumni Who Donate", ylab = "Out-of-State Tuition",
+     main = paste("Optimal Smoothing Spline (df =", best_df, ")"))
+
+lines(optimal_pred$x, optimal_pred$y, col = "red", lwd = 3)
+
+points(testing_data$perc.alumni, testing_data$Outstate, pch = 20, col = "blue")
+
+legend("topright", legend = c("Training Data", "Test Data", "Optimal Fit"),
+       col = c("grey", "blue", "red"), pch = c(20, 20, NA), lwd = c(NA, NA, 3))
+```
+
